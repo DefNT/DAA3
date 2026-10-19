@@ -23,6 +23,34 @@ public class GraphGenerator {
         return graph;
     }
 
+    public static Graph randomDirected(int vertices, int edgeCount, long seed) {
+        Graph graph = new Graph(vertices, true);
+        Random random = new Random(seed);
+        Set<Long> used = new HashSet<>();
+        while (graph.getEdges().size() < edgeCount) {
+            int from = random.nextInt(vertices);
+            int to = random.nextInt(vertices);
+            if (from != to) {
+                addUnique(graph, used, from, to, random.nextInt(100) + 1);
+            }
+        }
+        return graph;
+    }
+
+    public static Graph dag(int vertices, int edgeCount, long seed) {
+        Graph graph = new Graph(vertices, true);
+        Random random = new Random(seed);
+        Set<Long> used = new HashSet<>();
+        while (graph.getEdges().size() < edgeCount) {
+            int a = random.nextInt(vertices);
+            int b = random.nextInt(vertices);
+            if (a != b) {
+                addUnique(graph, used, Math.min(a, b), Math.max(a, b), random.nextInt(100) + 1);
+            }
+        }
+        return graph;
+    }
+
     private static void addUnique(Graph graph, Set<Long> used, int from, int to, int weight) {
         int first = graph.isDirected() ? from : Math.min(from, to);
         int second = graph.isDirected() ? to : Math.max(from, to);
