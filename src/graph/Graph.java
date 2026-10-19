@@ -19,4 +19,21 @@ public class Graph {
             adjacency.add(new ArrayList<>());
         }
     }
+
+    public void addEdge(int from, int to, int weight) {
+        checkVertex(from);
+        checkVertex(to);
+        Edge edge = new Edge(from, to, weight);
+        edges.add(edge);
+        adjacency.get(from).add(edge);
+        if (!directed) {
+            adjacency.get(to).add(new Edge(to, from, weight));
+        }
+    }
+
+    private void checkVertex(int vertex) {
+        if (vertex < 0 || vertex >= vertexCount) {
+            throw new IllegalArgumentException("Invalid vertex: " + vertex);
+        }
+    }
 }
