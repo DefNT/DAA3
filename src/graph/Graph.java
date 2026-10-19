@@ -36,4 +36,19 @@ public class Graph {
             throw new IllegalArgumentException("Invalid vertex: " + vertex);
         }
     }
+
+    public int getVertexCount() {
+        return vertexCount;
+    }
+    public boolean isDirected() {
+        return directed;
+    }
+    public List<Edge> getEdges() {
+        return edges;
+    }
+
+    public List<Edge> getAdjacentEdges(int vertex) {
+        checkVertex(vertex);
+        return adjacency.get(vertex);
+    }
 }
