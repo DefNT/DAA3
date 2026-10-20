@@ -32,6 +32,7 @@ public class Main {
         MSTResult prim = Prim.findMST(roads);
         System.out.println("Kruskal: weight = " + kruskal.getWeight() + ", connected = " + kruskal.isConnected());
         System.out.println("Prim: weight = " + prim.getWeight() + ", connected = " + prim.isConnected());
+        System.out.println("Same weight = " + (kruskal.getWeight() == prim.getWeight()));
         System.out.println();
     }
 
@@ -77,7 +78,7 @@ public class Main {
         for (int vertex = 0; vertex < DISTRICTS.length; vertex++) {
             if (result.isReachable(vertex)) {
                 System.out.println(DISTRICTS[vertex] + ": distance = " + result.getDistanceTo(vertex)
-                        + ", path = " + names(result.getPath(0, vertex)));
+                        + ", path = " + names(result.getPath(vertex)));
             } else {
                 System.out.println(DISTRICTS[vertex] + ": unreachable");
             }
