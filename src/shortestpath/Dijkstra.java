@@ -34,7 +34,10 @@ public class Dijkstra {
             return distances[vertex] != INF;
         }
 
-        public List<Integer> getPath(int source, int destination) {
+        public List<Integer> getPath(int destination) {
+            if (destination < 0 || destination >= distances.length) {
+                throw new IllegalArgumentException("Invalid vertex: " + destination);
+            }
             List<Integer> path = new ArrayList<>();
             if (distances[destination] == INF) {
                 return path;
@@ -77,10 +80,11 @@ public class Dijkstra {
         PriorityQueue<QueueEntry> queue =
                 new PriorityQueue<>(Comparator.comparingLong(entry -> entry.distance));
         queue.add(new QueueEntry(source, 0));
-        long operations = 0;
+        long operations = 1;
 
         while (!queue.isEmpty()) {
             QueueEntry current = queue.remove();
+            operations++;
             if (current.distance != distances[current.vertex]) {
                 continue;
             }
@@ -91,6 +95,7 @@ public class Dijkstra {
                     distances[edge.getTo()] = newDistance;
                     previous[edge.getTo()] = current.vertex;
                     queue.add(new QueueEntry(edge.getTo(), newDistance));
+                    operations++;
                 }
             }
         }
