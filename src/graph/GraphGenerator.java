@@ -5,8 +5,11 @@ import java.util.Random;
 import java.util.Set;
 
 public class GraphGenerator {
-
     public static Graph connectedUndirected(int vertices, int edgeCount, long seed) {
+        long max = (long) vertices * (vertices - 1) / 2;
+        if (vertices < 1 || edgeCount < vertices - 1 || edgeCount > max) {
+            throw new IllegalArgumentException("Edge count must be between V-1 and V(V-1)/2");
+        }
         Graph graph = new Graph(vertices, false);
         Random random = new Random(seed);
         Set<Long> used = new HashSet<>();
@@ -24,6 +27,10 @@ public class GraphGenerator {
     }
 
     public static Graph randomDirected(int vertices, int edgeCount, long seed) {
+        long max = (long) vertices * (vertices - 1);
+        if (vertices < 1 || edgeCount < 0 || edgeCount > max) {
+            throw new IllegalArgumentException("Edge count must be between 0 and V(V-1)");
+        }
         Graph graph = new Graph(vertices, true);
         Random random = new Random(seed);
         Set<Long> used = new HashSet<>();
@@ -38,6 +45,10 @@ public class GraphGenerator {
     }
 
     public static Graph dag(int vertices, int edgeCount, long seed) {
+        long max = (long) vertices * (vertices - 1) / 2;
+        if (vertices < 1 || edgeCount < 0 || edgeCount > max) {
+            throw new IllegalArgumentException("Edge count must be between 0 and V(V-1)/2");
+        }
         Graph graph = new Graph(vertices, true);
         Random random = new Random(seed);
         Set<Long> used = new HashSet<>();
