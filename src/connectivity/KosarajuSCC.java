@@ -26,6 +26,9 @@ public class KosarajuSCC {
     }
 
     public static Result find(Graph graph) {
+        if (!graph.isDirected()) {
+            throw new IllegalArgumentException("SCC needs a directed graph");
+        }
         int vertices = graph.getVertexCount();
         boolean[] visited = new boolean[vertices];
         List<Integer> finishOrder = new ArrayList<>();
@@ -43,6 +46,7 @@ public class KosarajuSCC {
         }
         for (Edge edge : graph.getEdges()) {
             reversed.get(edge.getTo()).add(edge.getFrom());
+            operations[0]++;
         }
 
         Arrays.fill(visited, false);

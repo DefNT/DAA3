@@ -32,6 +32,9 @@ public class TopologicalSort {
     }
 
     public static Result sort(Graph graph) {
+        if (!graph.isDirected()) {
+            throw new IllegalArgumentException("Topological sort needs a directed graph");
+        }
         int vertices = graph.getVertexCount();
         int[] indegree = new int[vertices];
         long operations = 0;
