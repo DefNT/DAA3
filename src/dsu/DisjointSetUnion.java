@@ -3,9 +3,17 @@ package dsu;
 public class DisjointSetUnion {
     private final int[] parent;
     private final int[] rank;
+    private final boolean pathCompression;
+    private final boolean unionByRank;
     private long operations;
 
     public DisjointSetUnion(int size) {
+        this(size, true, true);
+    }
+
+    public DisjointSetUnion(int size, boolean pathCompression, boolean unionByRank) {
+        this.pathCompression = pathCompression;
+        this.unionByRank = unionByRank;
         parent = new int[size];
         rank = new int[size];
         for (int i = 0; i < size; i++) {
@@ -15,10 +23,19 @@ public class DisjointSetUnion {
 
     public int find(int value) {
         operations++;
-        if (parent[value] != value) {
-            parent[value] = find(parent[value]);
+        int root = value;
+        while (parent[root] != root) {
+            root = parent[root];
+            operations++;
         }
-        return parent[value];
+        if (pathCompression) {
+            while (parent[value] != root) {
+                int next = parent[value];
+                parent[value] = root;
+                value = next;
+            }
+        }
+        return root;
     }
 
     public boolean union(int first, int second) {
@@ -28,7 +45,9 @@ public class DisjointSetUnion {
         if (firstRoot == secondRoot) {
             return false;
         }
-        if (rank[firstRoot] < rank[secondRoot]) {
+        if (!unionByRank) {
+            parent[secondRoot] = firstRoot;
+        } else if (rank[firstRoot] < rank[secondRoot]) {
             parent[firstRoot] = secondRoot;
         } else if (rank[firstRoot] > rank[secondRoot]) {
             parent[secondRoot] = firstRoot;
