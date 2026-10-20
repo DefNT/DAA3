@@ -1,6 +1,7 @@
 package graph;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class Graph {
@@ -44,11 +45,11 @@ public class Graph {
         return directed;
     }
     public List<Edge> getEdges() {
-        return edges;
+        return Collections.unmodifiableList(edges);
     }
 
     public List<Edge> getAdjacentEdges(int vertex) {
         checkVertex(vertex);
-        return adjacency.get(vertex);
+        return Collections.unmodifiableList(adjacency.get(vertex));
     }
 }
