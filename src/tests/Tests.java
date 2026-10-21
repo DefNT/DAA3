@@ -7,6 +7,7 @@ import graph.Graph;
 import mst.Kruskal;
 import mst.MSTResult;
 import mst.Prim;
+import shortestpath.Dijkstra;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -22,6 +23,7 @@ public class Tests {
         testDSU();
         testTopologicalSort();
         testSCC();
+        testDijkstra();
 
         System.out.println();
         System.out.println("Passed: " + passed + ", Failed: " + failed);
@@ -169,6 +171,47 @@ public class Tests {
         Graph one = new Graph(1, true);
         check("SCC: single vertex gives one component",
                 KosarajuSCC.find(one).getComponents().size() == 1);
+    }
+
+    private static void testDijkstra() {
+        Graph graph = new Graph(5, true);
+        graph.addEdge(0, 1, 4);
+        graph.addEdge(0, 2, 1);
+        graph.addEdge(2, 1, 2);
+        graph.addEdge(1, 3, 1);
+
+        Dijkstra.Result result = Dijkstra.findPaths(graph, 0);
+        check("Dijkstra: distances are 0, 3, 1, 4",
+                result.getDistanceTo(0) == 0
+                        && result.getDistanceTo(1) == 3
+                        && result.getDistanceTo(2) == 1
+                        && result.getDistanceTo(3) == 4);
+        check("Dijkstra: path to 3 is [0, 2, 1, 3]",
+                result.getPath(3).equals(Arrays.asList(0, 2, 1, 3)));
+        check("Dijkstra: unreachable vertex handled",
+                !result.isReachable(4) && result.getPath(4).isEmpty());
+
+        Graph one = new Graph(1, true);
+        Dijkstra.Result single = Dijkstra.findPaths(one, 0);
+        check("Dijkstra: single vertex has distance 0",
+                single.getDistanceTo(0) == 0
+                        && single.getPath(0).equals(Arrays.asList(0)));
+
+        Graph zeroWeights = new Graph(3, true);
+        zeroWeights.addEdge(0, 1, 0);
+        zeroWeights.addEdge(1, 2, 0);
+        check("Dijkstra: zero-weight edges are allowed",
+                Dijkstra.findPaths(zeroWeights, 0).getDistanceTo(2) == 0);
+
+        Graph negative = new Graph(2, true);
+        negative.addEdge(0, 1, -1);
+        boolean rejected = false;
+        try {
+            Dijkstra.findPaths(negative, 0);
+        } catch (IllegalArgumentException exception) {
+            rejected = true;
+        }
+        check("Dijkstra: negative weight rejected", rejected);
     }
 
     private static boolean validOrder(Graph graph, List<Integer> order) {
