@@ -3,7 +3,9 @@ package tests;
 import connectivity.KosarajuSCC;
 import connectivity.TopologicalSort;
 import dsu.DisjointSetUnion;
+import graph.Edge;
 import graph.Graph;
+import graph.GraphGenerator;
 import mst.Kruskal;
 import mst.MSTResult;
 import mst.Prim;
@@ -24,6 +26,7 @@ public class Tests {
         testTopologicalSort();
         testSCC();
         testDijkstra();
+        testRandomGraphs();
 
         System.out.println();
         System.out.println("Passed: " + passed + ", Failed: " + failed);
@@ -214,6 +217,77 @@ public class Tests {
         check("Dijkstra: negative weight rejected", rejected);
     }
 
+    private static void testRandomGraphs() {
+        boolean mstSame = true;
+        boolean orderValid = true;
+        boolean sccOk = true;
+        boolean dijkstraOk = true;
+
+        for (long seed = 1; seed <= 20; seed++) {
+            Graph undirected =
+                    GraphGenerator.connectedUndirected(50, 200, seed);
+            MSTResult kruskal = Kruskal.findMST(undirected);
+            MSTResult prim = Prim.findMST(undirected);
+            if (kruskal.getWeight() != prim.getWeight()
+                    || !kruskal.isConnected() || !prim.isConnected()) {
+                mstSame = false;
+            }
+
+            Graph dag = GraphGenerator.dag(50, 200, seed);
+            TopologicalSort.Result topo = TopologicalSort.sort(dag);
+            if (!topo.isAcyclic() || !validOrder(dag, topo.getOrder())) {
+                orderValid = false;
+            }
+
+            Graph directed = GraphGenerator.randomDirected(50, 120, seed);
+            if (!everyVertexOnce(KosarajuSCC.find(directed).getComponents(), 50)) {
+                sccOk = false;
+            }
+
+            Graph weighted = GraphGenerator.randomDirected(30, 90, seed);
+            Dijkstra.Result dijkstra = Dijkstra.findPaths(weighted, 0);
+            long[] expected = bellmanFord(weighted, 0);
+
+            for (int vertex = 0; vertex < 30; vertex++) {
+                if (expected[vertex] == Long.MAX_VALUE) {
+                    if (dijkstra.isReachable(vertex)) {
+                        dijkstraOk = false;
+                    }
+                } else if (!dijkstra.isReachable(vertex)
+                        || dijkstra.getDistanceTo(vertex) != expected[vertex]) {
+                    dijkstraOk = false;
+                }
+            }
+        }
+
+        check("20 random connected graphs: Kruskal and Prim agree",
+                mstSame);
+        check("20 random DAGs: topological order is valid",
+                orderValid);
+        check("20 random directed graphs: SCC membership is complete",
+                sccOk);
+        check("20 random directed graphs: Dijkstra matches Bellman-Ford",
+                dijkstraOk);
+
+        int[][] sizes = {{10, 30}, {100, 500}, {1000, 5000}};
+        boolean generatorsOk = true;
+
+        for (int[] size : sizes) {
+            Graph undirected = GraphGenerator.connectedUndirected(
+                    size[0], size[1], 42);
+            Graph dag = GraphGenerator.dag(size[0], size[1], 43);
+
+            if (undirected.getEdges().size() != size[1]
+                    || !Kruskal.findMST(undirected).isConnected()
+                    || !TopologicalSort.sort(dag).isAcyclic()) {
+                generatorsOk = false;
+            }
+        }
+
+        check("generators: required edge counts, connected graphs and DAGs",
+                generatorsOk);
+    }
+
     private static boolean validOrder(Graph graph, List<Integer> order) {
         int vertices = graph.getVertexCount();
         if (order.size() != vertices) {
@@ -233,7 +307,7 @@ public class Tests {
             position[vertex] = i;
         }
 
-        for (graph.Edge edge : graph.getEdges()) {
+        for (Edge edge : graph.getEdges()) {
             if (position[edge.getFrom()] >= position[edge.getTo()]) {
                 return false;
             }
@@ -262,6 +336,32 @@ public class Tests {
         }
 
         return true;
+    }
+
+    private static long[] bellmanFord(Graph graph, int source) {
+        long[] distance = new long[graph.getVertexCount()];
+        Arrays.fill(distance, Long.MAX_VALUE);
+        distance[source] = 0;
+
+        for (int round = 1; round < graph.getVertexCount(); round++) {
+            boolean changed = false;
+
+            for (Edge edge : graph.getEdges()) {
+                if (distance[edge.getFrom()] != Long.MAX_VALUE) {
+                    long candidate = distance[edge.getFrom()] + edge.getWeight();
+                    if (candidate < distance[edge.getTo()]) {
+                        distance[edge.getTo()] = candidate;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (!changed) {
+                break;
+            }
+        }
+
+        return distance;
     }
 
     private static void check(String name, boolean condition) {
