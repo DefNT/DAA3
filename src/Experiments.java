@@ -52,6 +52,78 @@ public class Experiments {
         }
     }
 
+    public static void main(String[] args) throws IOException {
+        Path output = Paths.get(
+                "results", "tables", "benchmark_results.csv");
+        Files.createDirectories(output.getParent());
+
+        try (BufferedWriter writer = Files.newBufferedWriter(output)) {
+            writer.write("experiment,algorithm,graph_type,vertices,edges,"
+                    + "average_time_ns,operations,result,status");
+            writer.newLine();
+
+            for (int[] size : REQUIRED_SIZES) {
+                runExperiments(writer, "SIZES", size[0], size[1], true);
+            }
+
+            for (int edges : EDGE_COUNTS) {
+                runExperiments(writer, "EDGES",
+                        FIXED_VERTEX_COUNT, edges, false);
+            }
+        }
+
+        System.out.println("Benchmark results saved to "
+                + output.toAbsolutePath());
+    }
+
+    private static void runExperiments(
+            BufferedWriter writer,
+            String experiment,
+            int vertices,
+            int edgeCount,
+            boolean includeDsuComparison) throws IOException {
+
+        long seed = SEED + vertices;
+        Graph undirected = GraphGenerator.connectedUndirected(
+                vertices, edgeCount, seed);
+        Graph dag = GraphGenerator.dag(
+                vertices, edgeCount, seed + 1);
+        Graph cyclic = cyclicDirected(
+                vertices, edgeCount, seed + 2);
+
+        if (!Kruskal.findMST(undirected).isConnected()) {
+            throw new IllegalStateException(
+                    "Generated undirected graph is not connected");
+        }
+        if (!TopologicalSort.sort(dag).isAcyclic()) {
+            throw new IllegalStateException(
+                    "Generated DAG unexpectedly contains a cycle");
+        }
+        if (TopologicalSort.sort(cyclic).isAcyclic()) {
+            throw new IllegalStateException(
+                    "Generated cyclic graph's cycle was not detected");
+        }
+
+        runMst(writer, experiment, undirected, vertices, edgeCount);
+        runDijkstra(writer, experiment, undirected,
+                "UNDIRECTED_CONNECTED", vertices, edgeCount);
+        runTopological(writer, experiment, dag,
+                "DAG", vertices, edgeCount);
+        runTopological(writer, experiment, cyclic,
+                "CYCLIC", vertices, edgeCount);
+        runScc(writer, experiment, dag,
+                "DAG", vertices, edgeCount);
+        runScc(writer, experiment, cyclic,
+                "CYCLIC", vertices, edgeCount);
+
+        if (includeDsuComparison) {
+            runDsuComparison(writer, undirected, vertices, edgeCount);
+        }
+
+        System.out.println("Finished " + experiment
+                + ": V=" + vertices + ", E=" + edgeCount);
+    }
+
     private static Measurement measure(Task task) {
         for (int i = 0; i < WARM_UP_RUNS; i++) {
             task.run();
@@ -72,5 +144,190 @@ public class Experiments {
                 totalNanos / (double) (REPEATS * BATCH_SIZE),
                 last[0],
                 last[1]);
+    }
+
+    private static void runMst(
+            BufferedWriter writer,
+            String experiment,
+            Graph graph,
+            int vertices,
+            int edges) throws IOException {
+
+        Measurement kruskal = measure(() -> {
+            MSTResult result = Kruskal.findMST(graph);
+            return new long[]{result.getOperations(), result.getWeight()};
+        });
+
+        Measurement prim = measure(() -> {
+            MSTResult result = Prim.findMST(graph);
+            return new long[]{result.getOperations(), result.getWeight()};
+        });
+
+        if (kruskal.result != prim.result) {
+            throw new IllegalStateException(
+                    "Kruskal and Prim returned different MST weights");
+        }
+
+        writeRow(writer, experiment, "Kruskal",
+                "UNDIRECTED_CONNECTED", vertices, edges,
+                kruskal, "connected");
+        writeRow(writer, experiment, "Prim",
+                "UNDIRECTED_CONNECTED", vertices, edges,
+                prim, "connected");
+    }
+
+    private static void runDijkstra(
+            BufferedWriter writer,
+            String experiment,
+            Graph graph,
+            String graphType,
+            int vertices,
+            int edges) throws IOException {
+
+        Measurement measurement = measure(() -> {
+            Dijkstra.Result result = Dijkstra.findPaths(graph, 0);
+            long reachable = 0;
+            for (int vertex = 0; vertex < vertices; vertex++) {
+                if (result.isReachable(vertex)) {
+                    reachable++;
+                }
+            }
+            return new long[]{result.getOperations(), reachable};
+        });
+
+        writeRow(writer, experiment, "Dijkstra", graphType,
+                vertices, edges, measurement,
+                "reachable vertices from source 0");
+    }
+
+    private static void runTopological(
+            BufferedWriter writer,
+            String experiment,
+            Graph graph,
+            String graphType,
+            int vertices,
+            int edges) throws IOException {
+
+        Measurement measurement = measure(() -> {
+            TopologicalSort.Result result = TopologicalSort.sort(graph);
+            return new long[]{result.getOperations(), result.getOrder().size()};
+        });
+
+        TopologicalSort.Result check = TopologicalSort.sort(graph);
+        String status = check.isAcyclic() ? "acyclic" : "cyclic";
+
+        writeRow(writer, experiment, "TopologicalSort", graphType,
+                vertices, edges, measurement, status);
+    }
+
+    private static void runScc(
+            BufferedWriter writer,
+            String experiment,
+            Graph graph,
+            String graphType,
+            int vertices,
+            int edges) throws IOException {
+
+        Measurement measurement = measure(() -> {
+            KosarajuSCC.Result result = KosarajuSCC.find(graph);
+            return new long[]{result.getOperations(),
+                    result.getComponents().size()};
+        });
+
+        writeRow(writer, experiment, "SCC", graphType,
+                vertices, edges, measurement,
+                "number of strongly connected components");
+    }
+
+    private static void runDsuComparison(
+            BufferedWriter writer,
+            Graph graph,
+            int vertices,
+            int edges) throws IOException {
+
+        boolean[] options = {true, false};
+
+        for (boolean compression : options) {
+            for (boolean rank : options) {
+                Measurement measurement = measure(() -> {
+                    DisjointSetUnion sets = new DisjointSetUnion(
+                            vertices, compression, rank);
+
+                    for (Edge edge : graph.getEdges()) {
+                        sets.union(edge.getFrom(), edge.getTo());
+                    }
+
+                    for (int vertex = 0; vertex < vertices; vertex++) {
+                        sets.find(vertex);
+                    }
+
+                    return new long[]{sets.getOperations(), 0};
+                });
+
+                String algorithm = "DSU compression=" + compression
+                        + " rank=" + rank;
+                writeRow(writer, "DSU", algorithm,
+                        "UNDIRECTED_CONNECTED", vertices, edges,
+                        measurement, "optimization comparison");
+            }
+        }
+    }
+
+    private static Graph cyclicDirected(
+            int vertices, int edgeCount, long seed) {
+
+        long maximumEdges = (long) vertices * (vertices - 1);
+        if (vertices < 2 || edgeCount < vertices
+                || edgeCount > maximumEdges) {
+            throw new IllegalArgumentException(
+                    "A cyclic graph needs V >= 2 and V <= E <= V(V-1)");
+        }
+
+        Graph graph = new Graph(vertices, true);
+        Random random = new Random(seed);
+        Set<Long> used = new HashSet<>();
+
+        for (int vertex = 0; vertex < vertices; vertex++) {
+            int next = (vertex + 1) % vertices;
+            used.add(edgeKey(vertex, next));
+            graph.addEdge(vertex, next, random.nextInt(100) + 1);
+        }
+
+        while (used.size() < edgeCount) {
+            int from = random.nextInt(vertices);
+            int to = random.nextInt(vertices);
+
+            if (from == to) {
+                continue;
+            }
+
+            if (used.add(edgeKey(from, to))) {
+                graph.addEdge(from, to, random.nextInt(100) + 1);
+            }
+        }
+
+        return graph;
+    }
+
+    private static long edgeKey(int from, int to) {
+        return ((long) from << 32) | (to & 0xffffffffL);
+    }
+
+    private static void writeRow(
+            BufferedWriter writer,
+            String experiment,
+            String algorithm,
+            String graphType,
+            int vertices,
+            int edges,
+            Measurement measurement,
+            String status) throws IOException {
+
+        writer.write(String.format(Locale.US,
+                "%s,%s,%s,%d,%d,%.1f,%d,%d,%s",
+                experiment, algorithm, graphType,
+                vertices, edges, measurement.averageNanos,
+                measurement.operations, measurement.result, status));
+        writer.newLine();
     }
 }
