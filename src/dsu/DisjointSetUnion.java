@@ -33,6 +33,7 @@ public class DisjointSetUnion {
                 int next = parent[value];
                 parent[value] = root;
                 value = next;
+                operations++;
             }
         }
         return root;
