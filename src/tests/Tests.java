@@ -1,10 +1,17 @@
 package tests;
 
+import connectivity.KosarajuSCC;
+import connectivity.TopologicalSort;
 import dsu.DisjointSetUnion;
 import graph.Graph;
 import mst.Kruskal;
 import mst.MSTResult;
 import mst.Prim;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class Tests {
     private static int passed = 0;
@@ -13,6 +20,8 @@ public class Tests {
     public static void main(String[] args) {
         testMST();
         testDSU();
+        testTopologicalSort();
+        testSCC();
 
         System.out.println();
         System.out.println("Passed: " + passed + ", Failed: " + failed);
@@ -104,6 +113,112 @@ public class Tests {
         }
 
         check("DSU: find/union work for all four optimization variants", ok);
+    }
+
+    private static void testTopologicalSort() {
+        Graph dag = new Graph(4, true);
+        dag.addEdge(0, 1, 1);
+        dag.addEdge(0, 2, 1);
+        dag.addEdge(1, 3, 1);
+        dag.addEdge(2, 3, 1);
+
+        TopologicalSort.Result result = TopologicalSort.sort(dag);
+        check("small DAG: acyclic with valid order",
+                result.isAcyclic() && validOrder(dag, result.getOrder()));
+
+        Graph cycle = new Graph(3, true);
+        cycle.addEdge(0, 1, 1);
+        cycle.addEdge(1, 2, 1);
+        cycle.addEdge(2, 0, 1);
+        TopologicalSort.Result cyclic = TopologicalSort.sort(cycle);
+        check("cyclic graph: cycle detected, no full order",
+                !cyclic.isAcyclic() && cyclic.getOrder().size() < 3);
+
+        Graph one = new Graph(1, true);
+        TopologicalSort.Result single = TopologicalSort.sort(one);
+        check("single vertex: topological order is [0]",
+                single.isAcyclic() && single.getOrder().equals(Arrays.asList(0)));
+    }
+
+    private static void testSCC() {
+        Graph graph = new Graph(5, true);
+        graph.addEdge(0, 1, 1);
+        graph.addEdge(1, 0, 1);
+        graph.addEdge(1, 2, 1);
+        graph.addEdge(2, 3, 1);
+        graph.addEdge(3, 2, 1);
+        graph.addEdge(3, 4, 1);
+
+        List<List<Integer>> components = KosarajuSCC.find(graph).getComponents();
+        Set<Set<Integer>> actual = new HashSet<>();
+
+        for (List<Integer> component : components) {
+            actual.add(new HashSet<>(component));
+        }
+
+        Set<Set<Integer>> expected = new HashSet<>();
+        expected.add(new HashSet<>(Arrays.asList(0, 1)));
+        expected.add(new HashSet<>(Arrays.asList(2, 3)));
+        expected.add(new HashSet<>(Arrays.asList(4)));
+
+        check("SCC: expected groups {0,1}, {2,3}, {4}",
+                actual.equals(expected));
+        check("SCC: every vertex belongs to exactly one component",
+                everyVertexOnce(components, 5));
+
+        Graph one = new Graph(1, true);
+        check("SCC: single vertex gives one component",
+                KosarajuSCC.find(one).getComponents().size() == 1);
+    }
+
+    private static boolean validOrder(Graph graph, List<Integer> order) {
+        int vertices = graph.getVertexCount();
+        if (order.size() != vertices) {
+            return false;
+        }
+
+        int[] position = new int[vertices];
+        Arrays.fill(position, -1);
+
+        for (int i = 0; i < order.size(); i++) {
+            int vertex = order.get(i);
+
+            if (vertex < 0 || vertex >= vertices || position[vertex] != -1) {
+                return false;
+            }
+
+            position[vertex] = i;
+        }
+
+        for (graph.Edge edge : graph.getEdges()) {
+            if (position[edge.getFrom()] >= position[edge.getTo()]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static boolean everyVertexOnce(
+            List<List<Integer>> components, int vertices) {
+        int[] count = new int[vertices];
+
+        for (List<Integer> component : components) {
+            for (int vertex : component) {
+                if (vertex < 0 || vertex >= vertices) {
+                    return false;
+                }
+                count[vertex]++;
+            }
+        }
+
+        for (int value : count) {
+            if (value != 1) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void check(String name, boolean condition) {
